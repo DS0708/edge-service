@@ -50,7 +50,18 @@ spring:
               maxBackOff: 500ms
               factor: 2
               basedOnPreviousValue: false #true이면 공식은 'prevBackoff * factor'
-
+        - name: RequestRateLimiter #RequestRateLimiter 필터는 KeyResolver 빈을 통해 요청에 대해 사용할 버킷을 결정(Spring Security의 현재 인증된 사용자를 버킷으로 사용하도록 기본 설정되어 있음)
+          args: #RequestRateLimiter가 타임아웃 제한, 서킷 브레이커, 재시도 같은 다른 패턴보다 제일 먼저 적용됨
+            redis-rate-limiter:
+              replenishRate: 10 #초당 버킷에 떨어지는 토큰의 수
+              burstCapacity: 20 #최대 20개 요청까지 허용
+              requestedTokens: 1  #하나의 요청 처리에 몇 개의 토근이 사용되는지 지정
+  data:
+    redis: #만약 레디스에 문제가 발생한다면, 레디스가 가동될 떄까지 사용률 제한은 일시적으로 비활성화된다.
+      connect-timeout: 2s
+      host: localhost
+      port: 6379
+      timeout: 1s
 
 resilience4j: #CircuitBreaker Filter를 적용할 라우터를 정의했다면, CircuitBreaker 자체를 설정해야한다.
   circuitbreaker:
@@ -66,8 +77,8 @@ resilience4j: #CircuitBreaker Filter를 적용할 라우터를 정의했다면, 
         timeoutDuration: 5s #5초 이내로 응답이 오지 않으면 실패로 간주 (위에서 정의한 spring.cloud.gateway.httpclinet.response-timeout보다 높은 우선순위를 가짐)
 
 
-logging:
-  level:
-    io.github.resilience4j: DEBUG
+#logging:
+#  level:
+#    io.github.resilience4j: DEBUG
 
 
