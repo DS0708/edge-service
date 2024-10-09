@@ -1,0 +1,43 @@
+server:
+  port: 9000
+  netty:
+    connection-timeout: 2s
+    idle-timeout: 15s   #데이터가 전송되지 않는 경우 TCP 연결을 끊기 전에 기다리는 시간
+  shutdown: graceful
+
+spring:
+  application:
+    name: edge-service
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+  cloud:
+    gateway:
+      routes: #Route 정의 목록
+        - id: catalog-route # Route ID
+          uri: ${CATALOG_SERVICE_URL:http://localhost:9001}/books
+          predicates: #predicates가 일치한다면 해당 route로 라우팅
+            - Path=/books/** #"/books/" 로 시작하는 모든 요청
+        - id: order-route
+          uri: ${ORDER_SERVICE_URL:http://localhost:9002}/orders #URI값은 환경 변수로부터 오거나 해당 환경 변수가 없는 경우 기본값(':'뒤의 값) 사용
+          predicates:
+            - Path=/orders/**
+      httpclient: #HTTP Client에 대한 설정 속성
+        connect-timeout: 2000 #내부의 서비스까지 TCP Connection하는 데 2초 이내
+        response-timeout: 5s #내부의 서비스로부터 5초 이내로 응답을 받아야 함
+        pool:
+          type: elastic #Netty의 HttpClient의 Connection Pool 유형 (elastic, fixed, disabled 중 하나), elastic는 요청 수에 따라 동적으로 Connection Object 증가
+          max-idle-time: 15s #15초 동안 아무 데이터도 주고 받지 않는 경우 connection을 닫음
+          max-life-time: 60s #모든 connection은 생성된 후 60초 뒤에는 종료
+      default-filters:   #기본 필터 목록
+        - name: Retry  #필터 이름, 모든 GET 요청에 대하여 재시도 전략 설정
+          args:
+            retries: 3   #최대 3회의 재시도
+            methods: GET  #GET 요청만 재시도
+            series: SERVER_ERROR  #5xx 오류에 대해서만 재시도
+            exceptions: java.io.IOException, java.util.concurrent.TimeoutException  #지정한 예외가 발생할 때만 재시도
+            backoff:  #재시도는 firstBackoff*(factor^n) 공식을 사용해 계산
+              firstBackoff: 50ms
+              maxBackOff: 500ms
+              factor: 2
+              basedOnPreviousValue: false #true이면 공식은 'prevBackoff * factor'
+
