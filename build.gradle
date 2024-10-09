@@ -24,6 +24,8 @@ ext {
 dependencies {
     // Spring Reactive Stack을 기반으로 만들어졌으며, 요청을 API로 라우팅하고 복원력, 보안, 모니터링 같은 공통 문제에 대한 유틸리티 제공
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
+    //Spring Cloud Circuit Breaker 사용을 위한 Resilience4J의 Reactive Version을 의존성에 추가
+    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-reactor-resilience4j'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

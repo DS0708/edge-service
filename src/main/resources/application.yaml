@@ -5,6 +5,7 @@ server:
     idle-timeout: 15s   #데이터가 전송되지 않는 경우 TCP 연결을 끊기 전에 기다리는 시간
   shutdown: graceful
 
+
 spring:
   application:
     name: edge-service
@@ -17,10 +18,19 @@ spring:
           uri: ${CATALOG_SERVICE_URL:http://localhost:9001}/books
           predicates: #predicates가 일치한다면 해당 route로 라우팅
             - Path=/books/** #"/books/" 로 시작하는 모든 요청
+          filters:  #CircuitBreaker Filter를 적용할 라우터를 정의
+            - name: CircuitBreaker
+              args:
+                name: catalogCircuitBreaker #CircuitBreaker 이름
+                fallbackUri: forward:/catalog-fallback  #회로가 'open' 상태일 때 요청을 이 URI로 전달, 또는 retry 실패 시에도 적용됨.
         - id: order-route
           uri: ${ORDER_SERVICE_URL:http://localhost:9002}/orders #URI값은 환경 변수로부터 오거나 해당 환경 변수가 없는 경우 기본값(':'뒤의 값) 사용
           predicates:
             - Path=/orders/**
+          filters:
+            - name: CircuitBreaker  #CircuitBreaker에 대한 FallBack을 정의하지 않음.
+              args:
+                name: orderCircuitBreaker
       httpclient: #HTTP Client에 대한 설정 속성
         connect-timeout: 2000 #내부의 서비스까지 TCP Connection하는 데 2초 이내
         response-timeout: 5s #내부의 서비스로부터 5초 이내로 응답을 받아야 함
@@ -40,4 +50,24 @@ spring:
               maxBackOff: 500ms
               factor: 2
               basedOnPreviousValue: false #true이면 공식은 'prevBackoff * factor'
+
+
+resilience4j: #CircuitBreaker Filter를 적용할 라우터를 정의했다면, CircuitBreaker 자체를 설정해야한다.
+  circuitbreaker:
+    configs:
+      default: #모든 CircuitBreaker에 대한 기본 설정
+        slidingWindowSize: 20 #회로가 'closed' 상태일 때 호출의 결과를 기록하는데 사용하는 Sliding Window의 크기
+        permittedNumberOfCallsInHalfOpenState: 5  #회로가 'half-open' 상태일 떄 허용되는 호출의 수
+        failureRateThreshold: 50  #실패율이 50% 이상이면 회로는 'open' 상태로 변경
+        waitDurationInOpenState: 15000  #'open' -> 'half-open' 으로 상태 변경시 기다리는 시간(15초)
+  timelimiter: #시간 제한 설정
+    configs:
+      default:
+        timeoutDuration: 5s #5초 이내로 응답이 오지 않으면 실패로 간주 (위에서 정의한 spring.cloud.gateway.httpclinet.response-timeout보다 높은 우선순위를 가짐)
+
+
+logging:
+  level:
+    io.github.resilience4j: DEBUG
+
 
