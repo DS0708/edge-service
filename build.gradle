@@ -32,6 +32,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
     //Spring에서 Session 관리를 위해 Spring Session Data Redis 사용
     implementation 'org.springframework.session:spring-session-data-redis'
+    //config-service로 부터 설정 데이터를 가져오기 위한 Spring Cloud Config Client를 위해 추가
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    //Netty는 성능상 이점을 얻기 위해 네이티브 코드를 사용해 시스템의 DNS 리졸버와 연동하는데, ARM 기반의 칩에서는 필요한 라이브러리가 없어서 이 native 라이브러리들을 직접 명시적으로 제공해줘야 한다.
+    runtimeOnly 'io.netty:netty-resolver-dns-native-macos:4.1.104.Final:osx-aarch_64'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -44,6 +48,20 @@ dependencyManagement {
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
         //TestContainers
         mavenBom "org.testcontainers:testcontainers-bom:${testcontainersVersion}"
+    }
+}
+
+bootBuildImage {
+    builder = "docker.io/paketobuildpacks/builder-jammy-base"
+    imageName = "${project.name}"
+    environment = ["BP_JVM_VERSION": "17"]
+
+    docker {
+        publishRegistry {
+            username = project.findProperty("registryUsername")
+            password = project.findProperty("registryToken")
+            url = project.findProperty("registryUrl")
+        }
     }
 }
 
