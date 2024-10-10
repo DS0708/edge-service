@@ -1,0 +1,93 @@
+name: Commit Stage
+on: push
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ds0708/edge-service
+  VERSION: latest
+
+jobs:
+  build:  # 작업의 고유 식별자
+    name: Build and Test  # 작업의 인간 친화적 명칭
+    runs-on: ubuntu-24.04 # 작업이 실행될 머신의 유형
+    permissions:  # 작업에 부여된 권한
+      contents: read  #현재 깃 저장소를 체크 아웃할 수 있는 권한
+      security-events: write  # 깃허브에 보안 이벤트를 제출할 수 있는 권한
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3 #현재 깃 저장소 (catalog-service)를 체크아웃
+      - name: Set up JDK
+        uses: actions/setup-java@v2 # 자바 런타임을 설치하고 설정
+        with: # 사용할 버전, 배포, 캐시 유형을 정의
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Build, unit tests and integration tests
+        run: |
+          chmod +x gradlew 
+          ./gradlew build
+      - name: Code vulnerability scanning
+        uses: anchore/scan-action@v3 # grype를 사용해 취약성을 스캔
+        id: scan
+        with:
+          path: "${{ github.workspace }}" # 체크아웃 저장소 패스
+          fail-build: false # 보안 취약성 발견 시 빌드 실패 여부
+          severity-cutoff: high # 오류로 간주할 최소 수준의 보안 유형(낮음, 중간, 높음 치명적)
+          acs-report-enable: true # 스캔이 완료된 이후에 리포트를 생성할지 여부
+      - name: Upload vulnerability report
+        uses: github/codeql-action/upload-sarif@v3  #깃허브로 보안 취약성 리포트(SARIF 형식) 전송
+        if: success() || failure() # 이전 단계가 실패하더라도 리포트 전송
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }} # 이전 단계 결과의 리포트를 가져온다.
+      - name: Setup tools # 쿠버네티스 매니페스트 파일 검증을 위한 사전작업
+        uses: alexellis/setup-arkade@v3
+      - name: Install tools
+        uses: alexellis/arkade-get@master # Arkade를 사용하여 지정된 도구를 설치
+        with:
+          kubeconform: latest # kubeconform은 k8s 매니페스트 유효성을 검사하는 도구
+      - name: Validate Kubernetes manifests
+        run: |
+          kubeconform --strict k8s
+  package:
+    name: Package and Publish
+    if: ${{ github.ref == 'refs/heads/main' }} #잡을 main 브랜치에 대해서만 실행
+    needs: [ build ]  #'build'잡이 성공적으로 수행된 경우에만 이 잡을 실행
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read  # 현재 깃 저장소를 체크아웃하기 위한 권한
+      packages: write # 깃허브 컨테이너 저장소로 이미지를 업로드하기 위한 권한
+      security-events: write  # 깃허브로 보안 이벤트를 제출하기 위한 권한
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4 # 현재 깃 저장소(catalog-service)를 체크아웃
+      - name: Set up JDK
+        uses: actions/setup-java@v4 # 자바 런타임을 설치하고 설정
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Build container image
+        run: |
+          chmod +x gradlew
+          ./gradlew bootBuildImage \
+            --imageName ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+      - name: OCI image vulnerability scanning
+        uses: anchore/scan-action@v3    # 취약성 검사를 위해 그라이프를 사용해 릴리스 후보 이미지를 스캔
+        id: scan
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} # 스캔할 이미지는 릴리스 후보
+          fail-build: false # 이미지에서 취약점이 발견되도 빌드를 실패로 만들지 않음
+          severity-cutoff: high
+      - name: Upload vulnerability report
+        uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure()
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+      - name: Log into container registry
+        uses: docker/login-action@v3  # 깃허브 컨테이너 저장소에 인증
+        with:
+          registry: ${{ env.REGISTRY }} # 저장소 정보는 환경 변수로 정의
+          username: ${{ github.actor }} # 깃허브 액션이 제공하는 현재 사용자의 깃허브 유저명
+          password: ${{ secrets.GITHUB_TOKEN }} # 저장소에 인증하기 위해 필요한 토큰으로 깃허브 액션이 제공
+      - name: Publish container image # 릴리스 후보를 저장소에 push
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
