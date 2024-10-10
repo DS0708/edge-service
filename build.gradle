@@ -19,6 +19,8 @@ repositories {
 
 ext {
     set('springCloudVersion', "2023.0.3")
+    //통합 테스트에서 경량 레디스 컨테이너를 사용하기 위해 추가
+    set('testcontainersVersion', "1.19.8")
 }
 
 dependencies {
@@ -28,14 +30,20 @@ dependencies {
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-reactor-resilience4j'
     //인 메모리 비관계 데이터 저장소인 레디스를 지원하는 Spring Data Redis 사용, Imperative & Reactive 모두 지원
     implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
+    //Spring에서 Session 관리를 위해 Spring Session Data Redis 사용
+    implementation 'org.springframework.session:spring-session-data-redis'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    //TestContainers
+    testImplementation 'org.testcontainers:junit-jupiter'
 }
 
 dependencyManagement {
     imports {
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        //TestContainers
+        mavenBom "org.testcontainers:testcontainers-bom:${testcontainersVersion}"
     }
 }
 
