@@ -37,6 +37,10 @@ dependencies {
     //Netty는 성능상 이점을 얻기 위해 네이티브 코드를 사용해 시스템의 DNS 리졸버와 연동하는데, ARM 기반의 칩에서는 필요한 라이브러리가 없어서 이 native 라이브러리들을 직접 명시적으로 제공해줘야 한다.
     runtimeOnly 'io.netty:netty-resolver-dns-native-macos:4.1.104.Final:osx-aarch_64'
 
+    //Spring Security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    testImplementation 'org.springframework.security:spring-security-test'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     //TestContainers
