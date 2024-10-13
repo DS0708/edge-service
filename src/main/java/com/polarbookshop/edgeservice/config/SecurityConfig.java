@@ -1,17 +1,24 @@
 package com.polarbookshop.edgeservice.config;
 
-/*
-* 보안과 관련된 모든 설정을 여기서 관리
-* */
-
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.client.oidc.web.server.logout.OidcClientInitiatedServerLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint;
 import org.springframework.security.web.server.authentication.logout.ServerLogoutSuccessHandler;
+import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
+import org.springframework.web.server.WebFilter;
+import reactor.core.publisher.Mono;
+import org.springframework.security.web.server.csrf.CsrfToken;
+
+/*
+ * 보안과 관련된 모든 설정을 여기서 관리
+ * */
 
 @EnableWebFluxSecurity //Spring Security WebFlux 지원 활성화
 public class SecurityConfig {
@@ -26,8 +33,17 @@ public class SecurityConfig {
         * authorizeExchange()를 사용하면 모든 요청에 대한 액세스 정책을 정의할 수 있다. (리액티브 스프링에서는 요청을 'Exchange'라고 부른다.)
         * */
         return http
-                //모든 요청에 대한 인증이 이뤄져야 한다.
-                .authorizeExchange(exchange -> exchange.anyExchange().authenticated())
+                //인증이 필요한 요청 정의
+                .authorizeExchange(exchange -> exchange
+                        //SPA의 정적 리소스에 대한 인증되지 않은 액세스 허용
+                        .pathMatchers("/","/*.css","/*.js","/favicon.ico").permitAll()
+                        //카탈로그의 도서에 대한 인증되지 않은 액세스 허용
+                        .pathMatchers(HttpMethod.GET, "/books/**").permitAll()
+                        //그 외 다른 요청은 사용자 인증 필요
+                        .anyExchange().authenticated())
+                //일단 SPA가 명시적으로 HTTP 401 응답을 가로채고 인증 흐름을 시작하도록 함
+                .exceptionHandling(exceptionHandling -> //사용자가 인증되지 않았기 때문에 예외를 발생할 때 HTTP 401로 응답
+                        exceptionHandling.authenticationEntryPoint(new HttpStatusServerEntryPoint(HttpStatus.UNAUTHORIZED)))
                 //ServerHttpSecurity는 Spring Security에서 OAuth2 클라이언트 설정을 위해 oauth2Login()와 oauth2Client()라는 2가지 방법을 제공.
                 //oauth2Login()를 사용하면 애플리케이션이 OAuth2 클라이언트 역할을 할 수 있도록 설정할 수 있으며, OIDC(Open ID Connect)를 통해 사용자 인증 가능
                 //oauth2Client()를 사용하면 애플리케이션은 사용자를 인증하지 않고 대신 인증 메커니즘 정의를 사용자에게 맡긴다.
@@ -35,6 +51,8 @@ public class SecurityConfig {
                 .oauth2Login(Customizer.withDefaults())
                 .logout(logout-> logout.logoutSuccessHandler( //로그아웃이 성공적으로 완료되는 경우에 대한 사용자 지정 핸들러 정의
                         oidcLogoutSuccessHandler(clientRegistrationRepository)))
+                //앵귤러 프론트엔드와 CSRF 토큰을 교환하기 위해 쿠키 기반 방식을 사용(기본적으로 CSRF 토큰은 http 헤더에 포함되지만 앵귤러는 쿠키에 CSRF토큰을 저장하는 방식)
+                .csrf(csrf -> csrf.csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse()))
                 .build();
     }
     /*
@@ -76,5 +94,22 @@ public class SecurityConfig {
         //OIDC 공급자인 키클록에서 로그아웃 후 사용자를 스프링에서 동적으로 지정하는 애플리케이션 베이스 URL로 리다이렉션한다.(로컬에서는 http://localhost:9000)
         oidcLogoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}");
         return oidcLogoutSuccessHandler;
+    }
+
+    /*
+    * 리액티브 스트림을 활성화하기 위해서는 활성화 스트림을 구독해야 한다.
+    * 현재 CookieServerCsrfTokenRepository는 CsrfToken 구독을 보장하지 않으므로
+    * WebFilter 빈에서 이에 대한 해결방안을 명시적으로 제공해야한다.
+    * */
+    @Bean
+    WebFilter csrfWebFilter() { //CsrfToken 리액티브 스트림을 구독하고 이 토큰의 값을 올바르게 추출하기 위한 목적만을 갖는 필터
+        // Required because of https://github.com/spring-projects/spring-security/issues/5766
+        return (exchange, chain) -> {
+            exchange.getResponse().beforeCommit(() -> Mono.defer(() -> {
+                Mono<CsrfToken> csrfToken = exchange.getAttribute(CsrfToken.class.getName());
+                return csrfToken != null ? csrfToken.then() : Mono.empty();
+            }));
+            return chain.filter(exchange);
+        };
     }
 }

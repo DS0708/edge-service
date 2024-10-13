@@ -43,6 +43,10 @@ spring:
             - name: CircuitBreaker  #CircuitBreaker에 대한 FallBack을 정의하지 않음.
               args:
                 name: orderCircuitBreaker
+        - id: spa-route
+          uri: ${SPA_URL:http://localhost:9004} #URI 값은 환경 변수로부터 오거나, 그렇지 않으면 ":" 뒤가 기본 값
+          predicates:
+            - Path=/,/*.css,/*.js,/favicon.ico #술어(predicates)는 루트 엔드포인트 그리고 SPA의 정적 리소스와 일치하는 경로들의 목록
       httpclient: #HTTP Client에 대한 설정 속성
         connect-timeout: 2000 #내부의 서비스까지 TCP Connection하는 데 2초 이내
         response-timeout: 5s #내부의 서비스로부터 5초 이내로 응답을 받아야 함
@@ -106,8 +110,6 @@ resilience4j: #CircuitBreaker Filter를 적용할 라우터를 정의했다면, 
       default:
         timeoutDuration: 5s #5초 이내로 응답이 오지 않으면 실패로 간주 (위에서 정의한 spring.cloud.gateway.httpclinet.response-timeout보다 높은 우선순위를 가짐)
 
-polar:
-  greeting: Welcome to the local book catalog!
 
 #logging:
 #  level:
