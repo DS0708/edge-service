@@ -80,6 +80,18 @@ spring:
     timeout: 10m  #세션에 대한 타임아웃, 기본값은 30분
     redis:
       namespace: polar:edge #edge-service로부터 오는 모든 Session Data 앞에 붙일 고유한 namespace 정의
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak: #Spring Security에서 클라이언트 등록을 식별하는 이름 ('registrationId'라고 부름)
+            client-id: edge-service #keycloak에서 정의된 OAuth2 클라이언트 식별자
+            client-secret: polar-keycloak-secret  #클라이언트가 Keycloak과 인증하기 위해 사용하는 공유 시크릿
+            scope: openid #클라이언트가 접근 권한을 갖기를 원하는 영역의 목록. openid 영역은 OAuth2에서 OIDC인증을 수행
+        provider:
+          keycloak: #몇 줄 위의 'registrationId'와 같은 이름
+            issuer-uri: http://localhost:8080/realms/PolarBookshop #특정 영역(realm)에 대한 OAuth2와 OIDC 관련 모든 엔드포인트의 정보를 제공하는 키클록 URL
+
 
 resilience4j: #CircuitBreaker Filter를 적용할 라우터를 정의했다면, CircuitBreaker 자체를 설정해야한다.
   circuitbreaker:
