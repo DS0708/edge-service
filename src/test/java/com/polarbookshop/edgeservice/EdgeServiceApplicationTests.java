@@ -1,6 +1,9 @@
 package com.polarbookshop.edgeservice;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.oauth2.client.reactive.ReactiveOAuth2ClientAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.reactive.ReactiveOAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -14,6 +17,9 @@ import org.testcontainers.utility.DockerImageName;
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )   //완전한 Spring Web Application Context와 Random port를 사용중인 웹 환경을 로드
+@EnableAutoConfiguration(exclude = { //OAuth2/Keycloak 관련 의존성 없이도 컨텍스트가 정상적으로 로드되게 함
+        ReactiveOAuth2ClientAutoConfiguration.class,
+        ReactiveOAuth2ResourceServerAutoConfiguration.class})
 @Testcontainers //테스트 컨테이너의 자동 시작과 종료를 활성화
 class EdgeServiceApplicationTests {
 
