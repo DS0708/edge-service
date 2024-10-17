@@ -22,9 +22,7 @@ public class SecurityConfig {
         return http
                 //모든 요청에 대한 인증이 이뤄져야 한다.
                 .authorizeExchange(exchange -> exchange.anyExchange().authenticated())
-                //사용자 인증은 로그인 양식을 통해 활성화, Spring Security Customizer Interface를 통해 제공되는 기본 설정 그대로 사용.
-                //이 기본 설정에는 프레임워크에서 제공하는 로그인 페이지와 인증이 되지 않은 경우 해당 페이지로의 자동 리다이렉션이 포함되어 있다.
-                .formLogin(Customizer.withDefaults())
+                .oauth2Login(Customizer.withDefaults())
                 .build();
     }
 }
