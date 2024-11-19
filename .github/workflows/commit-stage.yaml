@@ -3,7 +3,7 @@ on: push
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ds0708/edge-service
+  IMAGE_NAME: ds0708/polar-edge-service
   VERSION: latest
 
 jobs:
